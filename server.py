@@ -4,6 +4,9 @@ import os
 import time
 import zipfile
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+TZ = ZoneInfo("America/New_York")
 
 import httpx
 from dotenv import load_dotenv
@@ -128,7 +131,7 @@ async def fetch_arrivals() -> list[dict]:
                 "stop_name": cfg["name"],
                 "route":     route or "?",
                 "ts":        ts,
-                "time_fmt":  datetime.fromtimestamp(ts).strftime("%-I:%M %p"),
+                "time_fmt":  datetime.fromtimestamp(ts, TZ).strftime("%-I:%M %p"),
                 "mins":      max(0, (ts - now) // 60),
             })
 
@@ -143,7 +146,7 @@ def _is_express(route: str) -> bool:
 
 
 def render_html(buses: list[dict]) -> str:
-    now_str = datetime.now().strftime("%-I:%M %p")
+    now_str = datetime.now(TZ).strftime("%-I:%M %p")
 
     stop_pills = "".join(
         f'<div class="stop-pill {("express" if i == 0 else "local")}">{v["name"]}</div>'

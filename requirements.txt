@@ -3,3 +3,4 @@ uvicorn[standard]
 httpx
 gtfs-realtime-bindings
 python-dotenv
+tzdata
