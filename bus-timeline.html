@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bus Times</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+      background: #000;
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px 16px 48px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 28px;
+    }
+
+    .header-left h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .header-left p {
+      font-size: 13px;
+      color: #8e8e93;
+      margin-top: 2px;
+    }
+
+    .now-badge {
+      font-size: 12px;
+      font-weight: 600;
+      background: #1c1c1e;
+      border: 1px solid #3a3a3c;
+      border-radius: 20px;
+      padding: 4px 10px;
+      color: #8e8e93;
+    }
+
+    /* stop pills */
+    .stops {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .stop-pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.2px;
+    }
+
+    .stop-pill.express { background: #1a2a1a; color: #30d158; border: 1px solid #2a4a2a; }
+    .stop-pill.local   { background: #1a1a2a; color: #0a84ff; border: 1px solid #2a2a4a; }
+
+    /* timeline */
+    .timeline {
+      position: relative;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 58px;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: #2c2c2e;
+    }
+
+    .bus-entry {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 12px 0;
+      position: relative;
+    }
+
+    .bus-entry + .bus-entry {
+      border-top: 1px solid #1c1c1e;
+    }
+
+    .bus-entry.next-up {
+      background: linear-gradient(90deg, rgba(48,209,88,.06) 0%, transparent 100%);
+      border-radius: 12px;
+      padding: 12px 8px;
+      margin: 0 -8px;
+    }
+
+    /* time column */
+    .time-col {
+      width: 58px;
+      flex-shrink: 0;
+      padding-right: 20px;
+      text-align: right;
+    }
+
+    .time-col .hour {
+      font-size: 17px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+
+    .time-col .mins-away {
+      font-size: 10px;
+      color: #8e8e93;
+      margin-top: 2px;
+    }
+
+    .time-col .mins-away.soon { color: #ff9f0a; }
+    .time-col .mins-away.now  { color: #30d158; font-weight: 700; }
+
+    /* dot */
+    .dot-col {
+      width: 20px;
+      flex-shrink: 0;
+      display: flex;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid;
+    }
+
+    .dot.express { background: #0d2010; border-color: #30d158; }
+    .dot.local   { background: #0d0d20; border-color: #0a84ff; }
+    .dot.next-up { width: 13px; height: 13px; }
+
+    /* info column */
+    .info-col {
+      flex: 1;
+      padding-left: 14px;
+    }
+
+    .route-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .route-badge {
+      font-size: 13px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.3px;
+    }
+
+    .route-badge.express { background: #1e3b22; color: #30d158; }
+    .route-badge.local   { background: #1a1f35; color: #0a84ff; }
+
+    .next-tag {
+      font-size: 10px;
+      font-weight: 700;
+      color: #ff9f0a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .destination {
+      font-size: 14px;
+      font-weight: 500;
+      margin-top: 2px;
+      color: #e5e5ea;
+    }
+
+    .stop-name {
+      font-size: 11px;
+      color: #636366;
+      margin-top: 2px;
+    }
+
+    /* divider label */
+    .time-divider {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: #48484a;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 16px 0 8px;
+    }
+
+    .empty {
+      text-align: center;
+      color: #48484a;
+      font-size: 14px;
+      padding: 40px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <h1>Bus Times</h1>
+      <p id="subtitle">Loading...</p>
+    </div>
+    <div class="now-badge" id="nowBadge">—</div>
+  </header>
+
+  <div class="stops" id="stopPills"></div>
+
+  <div class="timeline" id="timeline"></div>
+
+  <script>
+    // ── PLACEHOLDERS — replaced by the Shortcut ──────────────────────────────
+    // Each placeholder becomes the raw SMS body, e.g.:
+    //   MyBus: US-22 70'E OF DUNDAR RD
+    //   7:23AM 114X NEW YORK EXPRESS
+    //   7:42AM 117 NEW YORK RT 22 EXPRESS
+    const RAW1 = `%%RESPONSE1%%`;
+    const RAW2 = `%%RESPONSE2%%`;
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    function parseResponse(raw) {
+      const lines = raw.trim().split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (!lines.length) return { stopName: "Unknown Stop", buses: [] };
+
+      const stopName = lines[0].replace(/^MyBus:\s*/i, "");
+      const buses = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        // format: "7:23AM 114X NEW YORK EXPRESS"
+        const m = lines[i].match(/^(\d{1,2}:\d{2}(?:AM|PM))\s+(\S+)\s+(.+)$/i);
+        if (!m) continue;
+        const [, timeStr, route, dest] = m;
+        const isExpress = /X$/i.test(route) || /express/i.test(dest);
+        buses.push({
+          timeStr,
+          route,
+          dest: dest.trim(),
+          stopName,
+          type: isExpress ? "express" : "local",
+          mins: timeToMins(timeStr),
+        });
+      }
+      return { stopName, buses };
+    }
+
+    function timeToMins(t) {
+      const m = t.match(/(\d+):(\d+)(AM|PM)/i);
+      if (!m) return 0;
+      let h = parseInt(m[1]), mn = parseInt(m[2]);
+      const p = m[3].toUpperCase();
+      if (p === "PM" && h !== 12) h += 12;
+      if (p === "AM" && h === 12) h = 0;
+      return h * 60 + mn;
+    }
+
+    function nowMins() {
+      const d = new Date();
+      return d.getHours() * 60 + d.getMinutes();
+    }
+
+    // ── parse ────────────────────────────────────────────────────────────────
+
+    const r1 = parseResponse(RAW1);
+    const r2 = parseResponse(RAW2);
+
+    const allBuses = [...r1.buses, ...r2.buses]
+      .sort((a, b) => a.mins - b.mins);
+
+    // ── render ───────────────────────────────────────────────────────────────
+
+    const now = nowMins();
+    const tl = document.getElementById("timeline");
+    const stopPills = document.getElementById("stopPills");
+
+    // subtitle + now badge
+    document.getElementById("subtitle").textContent =
+      `${allBuses.length} buses · ${r1.stopName.split(" ").slice(0, 3).join(" ")} + ${r2.stopName.split(" ").slice(0, 3).join(" ")}`;
+
+    const nowH = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    document.getElementById("nowBadge").textContent = "Now " + nowH;
+
+    // stop pills
+    [
+      { label: r1.stopName, cls: "express" },
+      { label: r2.stopName, cls: "local"   },
+    ].forEach(({ label, cls }) => {
+      const el = document.createElement("div");
+      el.className = `stop-pill ${cls}`;
+      el.textContent = label;
+      stopPills.appendChild(el);
+    });
+
+    if (!allBuses.length) {
+      tl.innerHTML = `<div class="empty">No buses found in the responses.</div>`;
+    } else {
+      let foundNext = false;
+      let shownPast = false;
+      let shownUpcoming = false;
+
+      allBuses.forEach((bus, i) => {
+        const diff = bus.mins - now;
+        const isPast = diff < -1;
+        const isNext = !foundNext && diff >= -1;
+        if (isNext) foundNext = true;
+
+        // section dividers
+        if (isPast && !shownPast) {
+          shownPast = true;
+          const d = document.createElement("div");
+          d.className = "time-divider";
+          d.textContent = "Earlier";
+          tl.appendChild(d);
+        }
+        if (!isPast && !shownUpcoming) {
+          shownUpcoming = true;
+          if (shownPast) {
+            const d = document.createElement("div");
+            d.className = "time-divider";
+            d.textContent = "Upcoming";
+            tl.appendChild(d);
+          }
+        }
+
+        // mins-away label
+        let awayLabel = "", awayCls = "";
+        if (diff <= 0 && diff > -2)      { awayLabel = "Arriving"; awayCls = "now"; }
+        else if (diff > 0 && diff <= 5)  { awayLabel = diff + " min"; awayCls = "soon"; }
+        else if (diff > 0)               { awayLabel = diff + " min"; awayCls = ""; }
+        else                             { awayLabel = "Departed"; awayCls = ""; }
+
+        const entry = document.createElement("div");
+        entry.className = `bus-entry${isNext ? " next-up" : ""}`;
+        entry.innerHTML = `
+          <div class="time-col">
+            <div class="hour">${bus.timeStr.replace(/(AM|PM)/, '<span style="font-size:11px;font-weight:400;color:#636366">$1</span>')}</div>
+            ${awayLabel ? `<div class="mins-away ${awayCls}">${awayLabel}</div>` : ""}
+          </div>
+          <div class="dot-col">
+            <div class="dot ${bus.type}${isNext ? " next-up" : ""}"></div>
+          </div>
+          <div class="info-col">
+            <div class="route-row">
+              <span class="route-badge ${bus.type}">${bus.route}</span>
+              ${isNext ? '<span class="next-tag">Next</span>' : ""}
+            </div>
+            <div class="destination">${bus.dest}</div>
+            <div class="stop-name">${bus.stopName}</div>
+          </div>`;
+        tl.appendChild(entry);
+      });
+    }
+  </script>
+</body>
+</html>
