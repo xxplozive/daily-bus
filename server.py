@@ -129,6 +129,7 @@ async def fetch_arrivals() -> list[dict]:
                 continue
             results.append({
                 "stop_name": cfg["name"],
+                "stop_cls":  "stop-a" if sid == list(targets.keys())[0] else "stop-b",
                 "route":     route or "?",
                 "ts":        ts,
                 "time_fmt":  datetime.fromtimestamp(ts, TZ).strftime("%-I:%M %p"),
@@ -141,15 +142,12 @@ async def fetch_arrivals() -> list[dict]:
 
 # ── HTML rendering ────────────────────────────────────────────────────────
 
-def _is_express(route: str) -> bool:
-    return route.upper().endswith("X") or route in {"117", "116", "115"}
-
 
 def render_html(buses: list[dict]) -> str:
     now_str = datetime.now(TZ).strftime("%-I:%M %p")
 
     stop_pills = "".join(
-        f'<div class="stop-pill {("express" if i == 0 else "local")}">{v["name"]}</div>'
+        f'<div class="stop-pill {("stop-a" if i == 0 else "stop-b")}">{v["name"]}</div>'
         for i, v in enumerate(STOP_CODES.values())
     )
 
@@ -158,10 +156,10 @@ def render_html(buses: list[dict]) -> str:
     else:
         rows = ""
         for i, b in enumerate(buses[:15]):
-            is_next  = i == 0
-            type_cls = "express" if _is_express(b["route"]) else "local"
-            next_cls = " next-up" if is_next else ""
-            next_tag = '<span class="next-tag">Next</span>' if is_next else ""
+            is_next   = i == 0
+            type_cls  = b["stop_cls"]
+            next_cls  = " next-up" if is_next else ""
+            next_tag  = '<span class="next-tag">Next</span>' if is_next else ""
 
             m = b["mins"]
             if m == 0:
@@ -206,8 +204,8 @@ def render_html(buses: list[dict]) -> str:
                border-radius:20px;padding:4px 10px;color:#6c6c70}}
     .stops{{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}}
     .stop-pill{{font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px}}
-    .stop-pill.express{{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}}
-    .stop-pill.local  {{background:#fce7f3;color:#be185d;border:1px solid #fbcfe8}}
+    .stop-pill.stop-a{{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}}
+    .stop-pill.stop-b{{background:#fce7f3;color:#be185d;border:1px solid #fbcfe8}}
     .timeline{{position:relative;background:#fff;border-radius:16px;
                padding:4px 16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
     .timeline::before{{content:"";position:absolute;left:88px;top:0;bottom:0;width:1px;background:#e5e5ea}}
@@ -223,14 +221,14 @@ def render_html(buses: list[dict]) -> str:
     .mins-away.now {{color:#16a34a;font-weight:700}}
     .dot-col{{width:20px;flex-shrink:0;display:flex;justify-content:center;position:relative;z-index:1}}
     .dot{{width:10px;height:10px;border-radius:50%;border:2px solid}}
-    .dot.express{{background:#eff6ff;border-color:#1d4ed8}}
-    .dot.local  {{background:#fdf2f8;border-color:#be185d}}
+    .dot.stop-a{{background:#eff6ff;border-color:#1d4ed8}}
+    .dot.stop-b{{background:#fdf2f8;border-color:#be185d}}
     .dot.next-up{{width:13px;height:13px}}
     .info-col{{flex:1;padding-left:14px}}
     .route-row{{display:flex;align-items:center;gap:8px}}
     .route-badge{{font-size:13px;font-weight:700;padding:2px 8px;border-radius:6px}}
-    .route-badge.express{{background:#dbeafe;color:#1d4ed8}}
-    .route-badge.local  {{background:#fce7f3;color:#be185d}}
+    .route-badge.stop-a{{background:#dbeafe;color:#1d4ed8}}
+    .route-badge.stop-b{{background:#fce7f3;color:#be185d}}
     .next-tag{{font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.5px}}
     .stop-name{{font-size:11px;color:#aeaeb2;margin-top:3px}}
     .empty{{text-align:center;color:#aeaeb2;font-size:14px;padding:40px 0}}
