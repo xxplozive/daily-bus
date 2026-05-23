@@ -44,24 +44,47 @@
       color: #8e8e93;
     }
 
-    /* stop pills */
-    .stops {
+    /* tab bar */
+    .tab-bar {
       display: flex;
-      gap: 8px;
+      gap: 0;
       margin-bottom: 24px;
-      flex-wrap: wrap;
+      background: #1c1c1e;
+      border-radius: 12px;
+      padding: 3px;
     }
 
-    .stop-pill {
-      font-size: 11px;
+    .tab-btn {
+      flex: 1;
+      font-size: 13px;
       font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 20px;
+      padding: 8px 0;
+      border-radius: 10px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
       letter-spacing: 0.2px;
+      transition: background 0.2s, color 0.2s;
+      color: #8e8e93;
     }
 
-    .stop-pill.express { background: #1a2a1a; color: #30d158; border: 1px solid #2a4a2a; }
-    .stop-pill.local   { background: #1a1a2a; color: #0a84ff; border: 1px solid #2a2a4a; }
+    .tab-btn.active.express { background: #1e3b22; color: #30d158; }
+    .tab-btn.active.local   { background: #1a1f35; color: #0a84ff; }
+
+    /* swipe container */
+    .swipe-wrap {
+      overflow: hidden;
+    }
+
+    .swipe-track {
+      display: flex;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+    }
+
+    .tab-panel {
+      min-width: 100%;
+    }
 
     /* timeline */
     .timeline {
@@ -215,21 +238,27 @@
     <div class="now-badge" id="nowBadge">—</div>
   </header>
 
-  <div class="stops" id="stopPills"></div>
+  <div class="tab-bar">
+    <button class="tab-btn express active" id="tabExpress" onclick="switchTab(0)">Express</button>
+    <button class="tab-btn local" id="tabLocal" onclick="switchTab(1)">Local</button>
+  </div>
 
-  <div class="timeline" id="timeline"></div>
+  <div class="swipe-wrap">
+    <div class="swipe-track" id="swipeTrack">
+      <div class="tab-panel">
+        <div class="timeline" id="timelineExpress"></div>
+      </div>
+      <div class="tab-panel">
+        <div class="timeline" id="timelineLocal"></div>
+      </div>
+    </div>
+  </div>
 
   <script>
     // ── PLACEHOLDERS — replaced by the Shortcut ──────────────────────────────
-    // Each placeholder becomes the raw SMS body, e.g.:
-    //   MyBus: US-22 70'E OF DUNDAR RD
-    //   7:23AM 114X NEW YORK EXPRESS
-    //   7:42AM 117 NEW YORK RT 22 EXPRESS
     const RAW1 = `%%RESPONSE1%%`;
     const RAW2 = `%%RESPONSE2%%`;
     // ─────────────────────────────────────────────────────────────────────────
-
-    // ── helpers ──────────────────────────────────────────────────────────────
 
     function parseResponse(raw) {
       const lines = raw.trim().split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -239,14 +268,12 @@
       const buses = [];
 
       for (let i = 1; i < lines.length; i++) {
-        // format: "7:23AM 114X NEW YORK EXPRESS"
         const m = lines[i].match(/^(\d{1,2}:\d{2}(?:AM|PM))\s+(\S+)\s+(.+)$/i);
         if (!m) continue;
         const [, timeStr, route, dest] = m;
         const isExpress = /X$/i.test(route) || /express/i.test(dest);
         buses.push({
-          timeStr,
-          route,
+          timeStr, route,
           dest: dest.trim(),
           stopName,
           type: isExpress ? "express" : "local",
@@ -271,52 +298,20 @@
       return d.getHours() * 60 + d.getMinutes();
     }
 
-    // ── parse ────────────────────────────────────────────────────────────────
+    function renderTimeline(tl, buses, stopType) {
+      if (!buses.length) {
+        tl.innerHTML = `<div class="empty">No buses found.</div>`;
+        return;
+      }
+      const now = nowMins();
+      let foundNext = false, shownPast = false, shownUpcoming = false;
 
-    const r1 = parseResponse(RAW1);
-    const r2 = parseResponse(RAW2);
-
-    const allBuses = [...r1.buses, ...r2.buses]
-      .sort((a, b) => a.mins - b.mins);
-
-    // ── render ───────────────────────────────────────────────────────────────
-
-    const now = nowMins();
-    const tl = document.getElementById("timeline");
-    const stopPills = document.getElementById("stopPills");
-
-    // subtitle + now badge
-    document.getElementById("subtitle").textContent =
-      `${allBuses.length} buses · ${r1.stopName.split(" ").slice(0, 3).join(" ")} + ${r2.stopName.split(" ").slice(0, 3).join(" ")}`;
-
-    const nowH = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    document.getElementById("nowBadge").textContent = "Now " + nowH;
-
-    // stop pills
-    [
-      { label: r1.stopName, cls: "express" },
-      { label: r2.stopName, cls: "local"   },
-    ].forEach(({ label, cls }) => {
-      const el = document.createElement("div");
-      el.className = `stop-pill ${cls}`;
-      el.textContent = label;
-      stopPills.appendChild(el);
-    });
-
-    if (!allBuses.length) {
-      tl.innerHTML = `<div class="empty">No buses found in the responses.</div>`;
-    } else {
-      let foundNext = false;
-      let shownPast = false;
-      let shownUpcoming = false;
-
-      allBuses.forEach((bus, i) => {
+      buses.forEach(bus => {
         const diff = bus.mins - now;
         const isPast = diff < -1;
         const isNext = !foundNext && diff >= -1;
         if (isNext) foundNext = true;
 
-        // section dividers
         if (isPast && !shownPast) {
           shownPast = true;
           const d = document.createElement("div");
@@ -334,12 +329,11 @@
           }
         }
 
-        // mins-away label
         let awayLabel = "", awayCls = "";
-        if (diff <= 0 && diff > -2)      { awayLabel = "Arriving"; awayCls = "now"; }
-        else if (diff > 0 && diff <= 5)  { awayLabel = diff + " min"; awayCls = "soon"; }
-        else if (diff > 0)               { awayLabel = diff + " min"; awayCls = ""; }
-        else                             { awayLabel = "Departed"; awayCls = ""; }
+        if (diff <= 0 && diff > -2)     { awayLabel = "Arriving"; awayCls = "now"; }
+        else if (diff > 0 && diff <= 5) { awayLabel = diff + " min"; awayCls = "soon"; }
+        else if (diff > 0)              { awayLabel = diff + " min"; }
+        else                            { awayLabel = "Departed"; }
 
         const entry = document.createElement("div");
         entry.className = `bus-entry${isNext ? " next-up" : ""}`;
@@ -362,6 +356,58 @@
         tl.appendChild(entry);
       });
     }
+
+    // ── parse & render ───────────────────────────────────────────────────────
+
+    const r1 = parseResponse(RAW1);
+    const r2 = parseResponse(RAW2);
+
+    const nowH = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    document.getElementById("nowBadge").textContent = "Now " + nowH;
+    document.getElementById("subtitle").textContent =
+      `${r1.stopName.split(" ").slice(0, 3).join(" ")} · ${r2.stopName.split(" ").slice(0, 3).join(" ")}`;
+
+    document.getElementById("tabExpress").textContent = "Express · " + r1.buses.length;
+    document.getElementById("tabLocal").textContent   = "Local · " + r2.buses.length;
+
+    renderTimeline(document.getElementById("timelineExpress"), r1.buses.sort((a,b)=>a.mins-b.mins), "express");
+    renderTimeline(document.getElementById("timelineLocal"),   r2.buses.sort((a,b)=>a.mins-b.mins), "local");
+
+    // ── tabs & swipe ─────────────────────────────────────────────────────────
+
+    let activeTab = 0;
+    const track = document.getElementById("swipeTrack");
+
+    function switchTab(idx) {
+      activeTab = idx;
+      track.style.transform = `translateX(${-idx * 100}%)`;
+      document.getElementById("tabExpress").className = "tab-btn express" + (idx === 0 ? " active" : "");
+      document.getElementById("tabLocal").className   = "tab-btn local"   + (idx === 1 ? " active" : "");
+    }
+
+    // swipe detection
+    let touchStartX = 0, touchStartY = 0, dragging = false;
+
+    track.addEventListener("touchstart", e => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      dragging = false;
+    }, { passive: true });
+
+    track.addEventListener("touchmove", e => {
+      const dx = e.touches[0].clientX - touchStartX;
+      const dy = e.touches[0].clientY - touchStartY;
+      if (!dragging && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+        dragging = true;
+      }
+    }, { passive: true });
+
+    track.addEventListener("touchend", e => {
+      if (!dragging) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      if (dx < -40 && activeTab === 0) switchTab(1);
+      else if (dx > 40 && activeTab === 1) switchTab(0);
+    });
   </script>
 </body>
 </html>
