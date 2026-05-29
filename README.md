@@ -1,8 +1,8 @@
 # Daily Bus Times
 
-A Python server that fetches real-time NJ Transit bus arrivals for two stops and renders them as a mobile-friendly HTML timeline. Tap a single iPhone Shortcut to see the next buses.
+> **No longer maintained.** Development stopped in May 2026 due to other priorities. The code is left here for reference.
 
-**Live:** `https://web-production-21e967.up.railway.app`
+A Python server that fetches real-time NJ Transit bus arrivals for two stops and renders them as a mobile-friendly HTML timeline. Tap a single iPhone Shortcut to see the next buses.
 
 ---
 
